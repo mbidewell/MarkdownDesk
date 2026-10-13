@@ -2,7 +2,7 @@
 
 An open-source, Mac-first Markdown editor with a single rich-text page, a Markdown source view, printing, and PDF export. Markdown files stay plain text and remain usable from the CLI.
 
-This is an early prototype, not a Typora replacement yet.
+This is an early prototype.
 
 ## Run on macOS
 
