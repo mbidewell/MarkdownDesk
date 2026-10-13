@@ -84,6 +84,7 @@ final class EditorController: NSObject, NSApplicationDelegate, NSWindowDelegate,
         case "command":
             guard let command = message.body as? String else { return }
             switch command {
+            case "new": newDocument(nil)
             case "open": openDocument(nil)
             case "save": save(nil)
             default: break
@@ -114,8 +115,9 @@ final class EditorController: NSObject, NSApplicationDelegate, NSWindowDelegate,
         return String(array.dropFirst().dropLast())
     }
 
-    private func loadMarkdown(_ text: String, name: String, base: String) {
-        let command = "editorAPI.setMarkdown(\(jsString(text)), \(jsString(name)), \(jsString(base)))"
+    private func loadMarkdown(_ text: String, name: String, base: String, focus: Bool = false) {
+        let command = "editorAPI.setMarkdown(\(jsString(text)), \(jsString(name)), \(jsString(base)));" +
+            (focus ? "editorAPI.focusEditor();" : "")
         webView.evaluateJavaScript(command, completionHandler: nil)
     }
 
@@ -157,7 +159,7 @@ final class EditorController: NSObject, NSApplicationDelegate, NSWindowDelegate,
             self.window.title = "Untitled.md"
             self.window.representedURL = nil
             self.dirty = false
-            self.loadMarkdown("", name: "Untitled.md", base: "file:///")
+            self.loadMarkdown("", name: "Untitled.md", base: "file:///", focus: true)
         }
     }
 

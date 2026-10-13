@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { JSDOM } = require('jsdom');
 
-async function editorWindow(onChanged = () => {}) {
+async function editorWindow(onChanged = () => {}, onCommand = () => {}) {
   const html = path.join(__dirname, '..', 'build', 'MarkdownDesk.app', 'Contents', 'Resources', 'Web', 'index.html');
   const dom = await JSDOM.fromFile(html, {
     resources: 'usable',
@@ -12,7 +12,8 @@ async function editorWindow(onChanged = () => {}) {
       window.webkit = { messageHandlers: {
         ready: { postMessage() {} },
         changed: { postMessage: onChanged },
-        openLink: { postMessage() {} }
+        openLink: { postMessage() {} },
+        command: { postMessage: onCommand }
       } };
     }
   });
@@ -22,6 +23,14 @@ async function editorWindow(onChanged = () => {}) {
   });
   return dom;
 }
+
+test('New button invokes the native New command', async () => {
+  const commands = [];
+  const dom = await editorWindow(() => {}, (command) => commands.push(command));
+  dom.window.document.querySelector('#new-file').click();
+  assert.deepEqual(commands, ['new']);
+  dom.window.close();
+});
 
 test('opens Markdown as rich text and preserves an unedited file byte for byte', async () => {
   const dom = await editorWindow();

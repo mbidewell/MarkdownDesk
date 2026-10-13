@@ -14,13 +14,13 @@ npm run build
 open build/MarkdownDesk.app
 ```
 
-Open an existing file through **File → Open** or from the Terminal:
+Create a blank document with **New** or **⌘N**, write your notes, then choose **Save** or **⌘S** to name the Markdown file and choose its folder. Open an existing file through **File → Open** or from the Terminal:
 
 ```sh
 open -a "$PWD/build/MarkdownDesk.app" "/absolute/path/to/note.md"
 ```
 
-Use **File → Export PDF** for a paginated PDF, or **File → Print** for the macOS print dialog. Toggle the Markdown source view with **⌘⇧M**. The toolbar groups paragraph style, emphasis, blocks, and links; **Open** and **Save** are always visible above it.
+Use **File → Export PDF** for a paginated PDF, or **File → Print** for the macOS print dialog. Toggle the Markdown source view with **⌘⇧M**. The toolbar groups paragraph style, emphasis, blocks, and links; **New**, **Open**, and **Save** are always visible above it.
 
 If the local Swift compiler and selected macOS SDK are mismatched, set `MARKDOWNDESK_SDK` to an installed compatible SDK path before building. The build script automatically chooses the macOS 26 SDK for Swift 6.3 Command Line Tools when available.
 

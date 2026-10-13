@@ -130,6 +130,7 @@
     const block = element?.closest('h1, h2, h3');
     blockStyle.value = block?.tagName.toLowerCase() || 'paragraph';
   });
+  document.getElementById('new-file').addEventListener('click', () => webkit.messageHandlers.command.postMessage('new'));
   document.getElementById('open-file').addEventListener('click', () => webkit.messageHandlers.command.postMessage('open'));
   document.getElementById('save-file').addEventListener('click', () => webkit.messageHandlers.command.postMessage('save'));
   modeButton.addEventListener('click', switchMode);
@@ -151,6 +152,7 @@
 
   window.editorAPI = {
     setMarkdown,
+    focusEditor: () => (document.body.classList.contains('source-mode') ? source : editor).focus(),
     getMarkdown: markdown,
     format,
     toggleSource: switchMode,

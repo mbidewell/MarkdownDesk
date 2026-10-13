@@ -12,12 +12,16 @@ cp node_modules/turndown-plugin-gfm/dist/turndown-plugin-gfm.js "$APP/Contents/R
 for name in marked dompurify turndown turndown-plugin-gfm; do
   cp "node_modules/$name/LICENSE" "$APP/Contents/Resources/Licenses/$name.txt"
 done
-SDK="${MARKDOWNDESK_SDK:-$(xcrun --show-sdk-path)}"
-if [[ -z "${MARKDOWNDESK_SDK:-}" && "$(swiftc --version 2>/dev/null)" == *"Swift version 6.3"* \
+SWIFT_ARCH=()
+if /usr/bin/arch -arm64 /usr/bin/true 2>/dev/null; then
+  SWIFT_ARCH=(/usr/bin/arch -arm64)
+fi
+SDK="${MARKDOWNDESK_SDK:-$("${SWIFT_ARCH[@]}" /usr/bin/xcrun --show-sdk-path)}"
+if [[ -z "${MARKDOWNDESK_SDK:-}" && "$("${SWIFT_ARCH[@]}" /usr/bin/swiftc --version 2>/dev/null)" == *"Swift version 6.3"* \
       && -d /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk ]]; then
   SDK=/Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk
 fi
-swiftc -swift-version 5 -O -sdk "$SDK" \
+"${SWIFT_ARCH[@]}" /usr/bin/swiftc -swift-version 5 -O -sdk "$SDK" \
   -module-cache-path "${PWD}/build/ModuleCache" -framework AppKit -framework WebKit \
   Sources/MarkdownDesk.swift -o "$APP/Contents/MacOS/MarkdownDesk"
 echo "$APP"
