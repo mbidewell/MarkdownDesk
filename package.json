@@ -1,0 +1,19 @@
+{
+  "name": "markdowndesk",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Build-time dependencies for the offline macOS Markdown editor",
+  "scripts": {
+    "build": "./scripts/build.sh",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "dompurify": "3.4.17",
+    "marked": "18.1.1",
+    "turndown": "7.2.4",
+    "turndown-plugin-gfm": "1.0.2"
+  },
+  "devDependencies": {
+    "jsdom": "27.4.0"
+  }
+}
