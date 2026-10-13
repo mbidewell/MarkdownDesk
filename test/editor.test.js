@@ -4,7 +4,8 @@ const path = require('node:path');
 const { JSDOM } = require('jsdom');
 
 async function editorWindow(onChanged = () => {}, onCommand = () => {}) {
-  const html = path.join(__dirname, '..', 'build', 'MarkdownDesk.app', 'Contents', 'Resources', 'Web', 'index.html');
+  const html = path.join(process.env.MARKDOWNDESK_BUILD_DIR || path.join(__dirname, '..', 'build'),
+    'MarkdownDesk.app', 'Contents', 'Resources', 'Web', 'index.html');
   const dom = await JSDOM.fromFile(html, {
     resources: 'usable',
     runScripts: 'dangerously',

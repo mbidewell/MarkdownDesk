@@ -24,13 +24,34 @@ Use **File → Export PDF** for a paginated PDF, or **File → Print** for the m
 
 If the local Swift compiler and selected macOS SDK are mismatched, set `MARKDOWNDESK_SDK` to an installed compatible SDK path before building. The build script automatically chooses the macOS 26 SDK for Swift 6.3 Command Line Tools when available.
 
+## Make a Mac installer
+
+To make a disk image for your own Mac:
+
+```sh
+npm ci
+npm run dmg
+```
+
+The output is in `dist/`. Open the `.dmg` and drag **MarkdownDesk** to **Applications**. This local disk image is unsigned and is intended for testing on the Mac where it was built. Its filename includes the CPU architecture; the current build produces an Apple silicon image on an Apple silicon Mac.
+
+For a public download, sign and notarize the app and disk image with an Apple **Developer ID Application** certificate. Store notarization credentials in your Keychain with `xcrun notarytool store-credentials`, then run:
+
+```sh
+export MARKDOWNDESK_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)"
+export MARKDOWNDESK_NOTARY_PROFILE="MarkdownDesk"
+./scripts/package-dmg.sh release
+```
+
+The release script builds and tests a separate app copy, signs it with hardened runtime, creates the disk image, waits for Apple notarization, staples the ticket, and validates it. Keep signing credentials out of the repository. Publish only the resulting signed image as a GitHub Release asset. See Apple's [distribution](https://developer.apple.com/documentation/technologyoverviews/distribution) and [notarization](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution) guidance.
+
 ## Current scope
 
 - Opens and saves UTF-8 `.md`, `.markdown`, and plain-text files.
 - Rich view displays headings, emphasis, links, lists, tables, task lists, code blocks, quotes, images, and horizontal rules.
 - YAML front matter is retained during rich edits. A file saved without editing keeps its original Markdown text.
 - The source view supports exact Markdown editing, including syntax the rich view does not handle.
-- The app is an unsigned local build. No installer, notarization, auto-update, or cross-platform release is included.
+- Auto-update and cross-platform releases are not included.
 
 Rich-text editing converts the document through HTML when saving. This can normalize whitespace, Markdown syntax choices, or advanced constructs such as footnotes, math, diagrams, embedded HTML, and nested tables. For those documents, edit in source view. Keep your files under version control or backed up while using this prototype.
 

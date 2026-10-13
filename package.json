@@ -5,6 +5,7 @@
   "description": "Build-time dependencies for the offline macOS Markdown editor",
   "scripts": {
     "build": "./scripts/build.sh",
+    "dmg": "./scripts/package-dmg.sh local",
     "test": "node --test"
   },
   "dependencies": {
