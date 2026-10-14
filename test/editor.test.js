@@ -1,11 +1,13 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const fs = require('node:fs');
 const { JSDOM } = require('jsdom');
 
 async function editorWindow(onChanged = () => {}, onCommand = () => {}) {
-  const html = path.join(process.env.MARKDOWNDESK_BUILD_DIR || path.join(__dirname, '..', 'build'),
+  const appHtml = path.join(process.env.MARKDOWNDESK_BUILD_DIR || path.join(__dirname, '..', 'build'),
     'MarkdownDesk.app', 'Contents', 'Resources', 'Web', 'index.html');
+  const html = fs.existsSync(appHtml) ? appHtml : path.join(__dirname, '..', 'Web', 'index.html');
   const dom = await JSDOM.fromFile(html, {
     resources: 'usable',
     runScripts: 'dangerously',

@@ -47,11 +47,24 @@
     wordcount.textContent = `${words ? words.length : 0} words`;
   }
 
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent || navigator.platform || '');
+  const modKeyShiftMSymbol = isMac ? '⌘⇧M' : 'Ctrl+Shift+M';
+
+  function postNativeMessage(name, data) {
+    if (window.webkit?.messageHandlers?.[name]) {
+      window.webkit.messageHandlers[name].postMessage(data);
+    } else if (window.__TAURI_INTERNALS__?.invoke) {
+      window.__TAURI_INTERNALS__.invoke('native_message', { name, data });
+    } else if (window.__TAURI__?.core?.invoke) {
+      window.__TAURI__.core.invoke('native_message', { name, data });
+    }
+  }
+
   function reportChange() {
     const firstChange = !changed;
     changed = true;
     updateWordCount();
-    if (firstChange && window.webkit?.messageHandlers?.changed) webkit.messageHandlers.changed.postMessage(true);
+    if (firstChange) postNativeMessage('changed', true);
   }
 
   function setMarkdown(text, name, base) {
@@ -76,13 +89,13 @@
     if (document.body.classList.contains('source-mode')) {
       render(source.value);
       document.body.classList.remove('source-mode');
-      modeButton.innerHTML = 'Source <span class="mode-glyph" aria-hidden="true">⌘⇧M</span>';
+      modeButton.innerHTML = `Source <span class="mode-glyph" aria-hidden="true">${modKeyShiftMSymbol}</span>`;
       viewLabel.textContent = 'RICH TEXT';
       editor.focus();
     } else {
       source.value = markdown();
       document.body.classList.add('source-mode');
-      modeButton.innerHTML = 'Rich text <span class="mode-glyph" aria-hidden="true">⌘⇧M</span>';
+      modeButton.innerHTML = `Rich text <span class="mode-glyph" aria-hidden="true">${modKeyShiftMSymbol}</span>`;
       viewLabel.textContent = 'MARKDOWN SOURCE';
       source.focus();
     }
@@ -130,25 +143,62 @@
     const block = element?.closest('h1, h2, h3');
     blockStyle.value = block?.tagName.toLowerCase() || 'paragraph';
   });
-  document.getElementById('new-file').addEventListener('click', () => webkit.messageHandlers.command.postMessage('new'));
-  document.getElementById('open-file').addEventListener('click', () => webkit.messageHandlers.command.postMessage('open'));
-  document.getElementById('save-file').addEventListener('click', () => webkit.messageHandlers.command.postMessage('save'));
+  document.getElementById('new-file').addEventListener('click', () => postNativeMessage('command', 'new'));
+  document.getElementById('open-file').addEventListener('click', () => postNativeMessage('command', 'open'));
+  document.getElementById('save-file').addEventListener('click', () => postNativeMessage('command', 'save'));
   modeButton.addEventListener('click', switchMode);
   editor.addEventListener('input', reportChange);
   source.addEventListener('input', reportChange);
   editor.addEventListener('click', (event) => {
     const link = event.target.closest('a');
-    if (link && event.metaKey) {
+    if (link && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();
-      webkit.messageHandlers.openLink.postMessage(link.href);
+      postNativeMessage('openLink', link.href);
     }
   });
   document.addEventListener('keydown', (event) => {
-    if (event.metaKey && event.shiftKey && event.key.toLowerCase() === 'm') {
+    const isMod = isMac ? event.metaKey : event.ctrlKey;
+    if (isMod && event.shiftKey && event.key.toLowerCase() === 'm') {
       event.preventDefault();
       switchMode();
+    } else if (isMod && !event.shiftKey && event.key.toLowerCase() === 's') {
+      event.preventDefault();
+      postNativeMessage('command', 'save');
+    } else if (isMod && !event.shiftKey && event.key.toLowerCase() === 'o') {
+      event.preventDefault();
+      postNativeMessage('command', 'open');
+    } else if (isMod && !event.shiftKey && event.key.toLowerCase() === 'n') {
+      event.preventDefault();
+      postNativeMessage('command', 'new');
     }
   });
+
+  if (!isMac) {
+    const newBtn = document.getElementById('new-file');
+    if (newBtn) {
+      newBtn.title = 'New Markdown file (Ctrl+N)';
+      const s = newBtn.querySelector('.shortcut');
+      if (s) s.textContent = 'Ctrl+N';
+    }
+    const openBtn = document.getElementById('open-file');
+    if (openBtn) {
+      openBtn.title = 'Open a Markdown file (Ctrl+O)';
+      const s = openBtn.querySelector('.shortcut');
+      if (s) s.textContent = 'Ctrl+O';
+    }
+    const saveBtn = document.getElementById('save-file');
+    if (saveBtn) {
+      saveBtn.title = 'Save Markdown (Ctrl+S)';
+      const s = saveBtn.querySelector('.shortcut');
+      if (s) s.textContent = 'Ctrl+S';
+    }
+    const modeBtn = document.getElementById('mode');
+    if (modeBtn) {
+      modeBtn.title = 'Switch between rich text and Markdown source (Ctrl+Shift+M)';
+      const s = modeBtn.querySelector('.mode-glyph');
+      if (s) s.textContent = 'Ctrl+Shift+M';
+    }
+  }
 
   window.editorAPI = {
     setMarkdown,
@@ -156,6 +206,10 @@
     getMarkdown: markdown,
     format,
     toggleSource: switchMode,
+    print: () => {
+      if (document.body.classList.contains('source-mode')) render(source.value);
+      window.print();
+    },
     getPrintHTML: () => {
       if (document.body.classList.contains('source-mode')) render(source.value);
       const base = document.querySelector('base')?.outerHTML || '';
@@ -175,5 +229,5 @@
     }
   };
   setMarkdown('', 'Untitled.md', 'file:///');
-  webkit.messageHandlers.ready.postMessage(true);
+  postNativeMessage('ready', true);
 })();

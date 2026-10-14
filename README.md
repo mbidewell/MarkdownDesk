@@ -24,6 +24,25 @@ Use **File → Export PDF** for a paginated PDF, or **File → Print** for the m
 
 If the local Swift compiler and selected macOS SDK are mismatched, set `MARKDOWNDESK_SDK` to an installed compatible SDK path before building. The build script automatically chooses the macOS 26 SDK for Swift 6.3 Command Line Tools when available.
 
+## Run on Linux (AppImage)
+
+Requirements: Linux (x86_64), Node.js 20 or later, npm, Rust/Cargo, and WebKitGTK (`webkit2gtk-4.1` or `webkitgtk-6.0`).
+
+```sh
+npm ci
+npm run appimage
+```
+
+The standalone AppImage is generated in:
+```
+src-tauri/target/release/bundle/appimage/MarkdownDesk_0.1.0_amd64.AppImage
+```
+
+Run it directly or pass a Markdown file from the command line:
+```sh
+./src-tauri/target/release/bundle/appimage/MarkdownDesk_0.1.0_amd64.AppImage "/path/to/note.md"
+```
+
 ## Make a Mac installer
 
 To make a disk image for your own Mac:

@@ -1,4 +1,5 @@
 node_modules/
 build/
 dist/
+Web/vendor/
 .DS_Store
