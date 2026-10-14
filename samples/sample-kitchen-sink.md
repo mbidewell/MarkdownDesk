@@ -150,7 +150,7 @@ npm run appimage
 
 An inline test image with alt text and title:
 
-![MarkdownDesk Icon](https://raw.githubusercontent.com/mbidewell/MarkdownDesk/main/Web/index.html "MarkdownDesk logo placeholder")
+![MarkdownDesk Icon](https://raw.githubusercontent.com/mbidewell/MarkdownDesk/crossplatform/app-icon.png "MarkdownDesk logo")
 
 ***
 

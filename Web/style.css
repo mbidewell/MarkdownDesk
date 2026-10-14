@@ -91,8 +91,45 @@ button { cursor: pointer; }
 #editor table { width: 100%; border-collapse: collapse; font: 14px/1.5 "Avenir Next", system-ui, sans-serif; }
 #editor th, #editor td { border-bottom: 1px solid var(--line); padding: .55em .7em; text-align: left; }
 #editor th { border-bottom: 2px solid var(--ink); font-weight: 700; }
-#editor img { max-width: 100%; }
-#editor a { color: #a74e35; text-decoration-color: #c18d7c; }
+#editor a { color: #a74e35; text-decoration-color: #c18d7c; cursor: text; }
+body.mod-active #editor a { cursor: pointer; text-decoration: underline; text-decoration-color: var(--accent); }
+body.mod-active #source { cursor: pointer; }
+
+.link-hint {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.12s ease-in-out, transform 0.12s ease-in-out;
+  transform: translateY(-2px);
+  background: var(--ink);
+  color: #fffefa;
+  font-family: ui-monospace, "SFMono-Regular", "Menlo", "JetBrains Mono", "Fira Code", monospace;
+  font-size: 11px;
+  line-height: 1.35;
+  padding: 5px 9px;
+  border-radius: 4px;
+  box-shadow: 0 4px 14px rgba(35, 39, 35, 0.22);
+  max-width: 420px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.link-hint.visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+@keyframes anchor-flash {
+  0% { background-color: rgba(188, 89, 61, 0.25); border-radius: 4px; }
+  100% { background-color: transparent; border-radius: 4px; }
+}
+.anchor-highlight {
+  animation: anchor-flash 1.5s ease-out;
+}
+
 #editor hr { border: 0; border-top: 1px solid var(--line); margin: 2.2em 0; }
 #editor input[type=checkbox] { margin-right: .55em; accent-color: var(--accent); }
 #source { display: none; resize: none; font: 14px/1.7 ui-monospace, "SFMono-Regular", "Menlo", "JetBrains Mono", "Fira Code", "Liberation Mono", "DejaVu Sans Mono", monospace; tab-size: 2; }

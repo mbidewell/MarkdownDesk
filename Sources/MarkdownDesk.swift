@@ -78,9 +78,17 @@ final class EditorController: NSObject, NSApplicationDelegate, NSWindowDelegate,
             if let url = pendingURL { pendingURL = nil; open(url) }
         case "changed": dirty = true
         case "openLink":
-            guard let string = message.body as? String, let url = URL(string: string),
-                  ["https", "http", "mailto"].contains(url.scheme?.lowercased() ?? "") else { return }
-            NSWorkspace.shared.open(url)
+            guard let string = message.body as? String, let url = URL(string: string) else { return }
+            let scheme = url.scheme?.lowercased() ?? ""
+            if ["https", "http", "mailto"].contains(scheme) {
+                NSWorkspace.shared.open(url)
+            } else if scheme == "file" {
+                if ["md", "markdown", "txt"].contains(url.pathExtension.lowercased()) {
+                    open(url)
+                } else {
+                    NSWorkspace.shared.open(url)
+                }
+            }
         case "command":
             guard let command = message.body as? String else { return }
             switch command {

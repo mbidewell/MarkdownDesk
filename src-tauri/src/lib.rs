@@ -5,6 +5,7 @@ use tauri::{
     AppHandle, Manager, WebviewWindow, WindowEvent,
 };
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+use url::Url;
 
 pub struct AppState {
     pub current_file: Mutex<Option<PathBuf>>,
@@ -111,6 +112,46 @@ fn prompt_new_document(window: &WebviewWindow, app: &AppHandle) {
     }
 }
 
+fn confirm_and_open_file(window: &WebviewWindow, path: PathBuf, app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let is_dirty = *state.dirty.lock().unwrap();
+    if is_dirty {
+        let title_name = state
+            .current_file
+            .lock()
+            .unwrap()
+            .as_ref()
+            .and_then(|f| f.file_name())
+            .and_then(|n| n.to_str())
+            .unwrap_or("Untitled.md")
+            .to_string();
+
+        let window_clone = window.clone();
+        let app_clone = app.clone();
+        let target_path = path.clone();
+        window
+            .dialog()
+            .message(format!("Save changes to {}?", title_name))
+            .title("Unsaved Changes")
+            .kind(MessageDialogKind::Warning)
+            .buttons(MessageDialogButtons::OkCancelCustom(
+                "Save".to_string(),
+                "Discard".to_string(),
+            ))
+            .show(move |result| {
+                if result {
+                    *app_clone.state::<AppState>().pending_file.lock().unwrap() =
+                        Some(target_path);
+                    let _ = window_clone.eval("postNativeMessage('command', 'save');");
+                } else {
+                    open_file_at_path(&window_clone, target_path, &app_clone);
+                }
+            });
+    } else {
+        open_file_at_path(window, path, app);
+    }
+}
+
 fn prompt_open_dialog(window: &WebviewWindow, app: &AppHandle) {
     let app_clone = app.clone();
     let window_clone = window.clone();
@@ -126,7 +167,7 @@ fn prompt_open_dialog(window: &WebviewWindow, app: &AppHandle) {
                         PathBuf::from(url.to_file_path().unwrap_or_default())
                     }
                 };
-                open_file_at_path(&window_clone, p, &app_clone);
+                confirm_and_open_file(&window_clone, p, &app_clone);
             }
         });
 }
@@ -207,12 +248,17 @@ fn save_content(
         .map(|p| format!("file://{}/", p.display()))
         .unwrap_or_else(|| "file:///".to_string());
 
-    let _ = window.eval(&format!(
-        "editorAPI.setMarkdown({}, {}, {});",
-        js_string(&content),
-        js_string(filename),
-        js_string(&base)
-    ));
+    let pending = state.pending_file.lock().unwrap().take();
+    if let Some(pending_path) = pending {
+        open_file_at_path(&window, pending_path, &app);
+    } else {
+        let _ = window.eval(&format!(
+            "editorAPI.setMarkdown({}, {}, {});",
+            js_string(&content),
+            js_string(filename),
+            js_string(&base)
+        ));
+    }
 
     Ok(target.to_string_lossy().to_string())
 }
@@ -240,8 +286,23 @@ fn native_message(
             update_window_title(&window, current.as_ref(), true);
         }
         "openLink" => {
-            if let Some(serde_json::Value::String(url)) = data {
-                let _ = open::that(&url);
+            if let Some(serde_json::Value::String(url_str)) = data {
+                if let Ok(parsed) = Url::parse(&url_str) {
+                    if parsed.scheme() == "file" {
+                        if let Ok(file_path) = parsed.to_file_path() {
+                            let ext = file_path
+                                .extension()
+                                .and_then(|e| e.to_str())
+                                .unwrap_or("")
+                                .to_lowercase();
+                            if ext == "md" || ext == "markdown" || ext == "txt" {
+                                confirm_and_open_file(&window, file_path, &app);
+                                return;
+                            }
+                        }
+                    }
+                }
+                let _ = open::that(&url_str);
             }
         }
         "command" => {
