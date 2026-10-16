@@ -1,0 +1,42 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "MarkdownDesk",
+  "version": "0.1.0",
+  "identifier": "org.markdowndesk.editor",
+  "build": {
+    "frontendDist": "../Web",
+    "beforeDevCommand": "node scripts/prepare-vendor.js",
+    "beforeBuildCommand": "node scripts/prepare-vendor.js"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Untitled.md",
+        "width": 1040,
+        "height": 760,
+        "minWidth": 700,
+        "minHeight": 450,
+        "center": true,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "category": "Productivity",
+    "shortDescription": "Offline-first Markdown editor",
+    "longDescription": "An open-source Markdown editor with rich text, Markdown source view, printing, and PDF export.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

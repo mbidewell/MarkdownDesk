@@ -4,9 +4,14 @@
   "version": "0.1.0",
   "description": "Build-time dependencies for the offline macOS Markdown editor",
   "scripts": {
-    "build": "./scripts/build.sh",
+    "prepare-vendor": "node scripts/prepare-vendor.js",
+    "build": "node scripts/build.js",
+    "build:mac": "./scripts/build.sh",
+    "build:linux": "npx tauri build",
+    "appimage": "npx tauri build --bundles appimage",
     "dmg": "./scripts/package-dmg.sh local",
-    "test": "node --test"
+    "pretest": "node scripts/prepare-vendor.js",
+    "test": "node scripts/prepare-vendor.js && node --test"
   },
   "dependencies": {
     "dompurify": "3.4.17",
@@ -15,6 +20,7 @@
     "turndown-plugin-gfm": "1.0.2"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.12.2",
     "jsdom": "27.4.0"
   }
 }

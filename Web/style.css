@@ -6,7 +6,7 @@
   --paper: #fffefa;
   --canvas: #e9e9e3;
   --accent: #bc593d;
-  font-family: "Avenir Next", Avenir, -apple-system, sans-serif;
+  font-family: "Avenir Next", Avenir, system-ui, -apple-system, "Cantarell", "Ubuntu", "Segoe UI", sans-serif;
 }
 * { box-sizing: border-box; }
 html, body, #app-shell { height: 100%; margin: 0; }
@@ -74,9 +74,9 @@ button { cursor: pointer; }
 .paper-header { display: flex; align-items: center; gap: 13px; padding: 46px 72px 0; color: #9d9b91; font-size: 9px; font-weight: 700; letter-spacing: .17em; }
 .paper-rule { height: 1px; flex: 1; background: #deddd5; }
 #editor, #source { display: block; width: 100%; min-height: 660px; padding: 35px 72px 110px; border: 0; outline: 0; background: transparent; color: var(--ink); }
-#editor { font: 18px/1.73 "Iowan Old Style", Georgia, serif; overflow-wrap: break-word; }
+#editor { font: 18px/1.73 "Iowan Old Style", Georgia, "DejaVu Serif", "Noto Serif", "Liberation Serif", serif; overflow-wrap: break-word; }
 #editor:empty::before { content: "Begin writing…"; color: #aba99f; }
-#editor h1, #editor h2, #editor h3 { font-family: "Avenir Next", Avenir, sans-serif; line-height: 1.24; letter-spacing: -.025em; color: #252b27; break-after: avoid; }
+#editor h1, #editor h2, #editor h3 { font-family: "Avenir Next", Avenir, system-ui, -apple-system, "Cantarell", "Ubuntu", "Segoe UI", sans-serif; line-height: 1.24; letter-spacing: -.025em; color: #252b27; break-after: avoid; }
 #editor h1 { font-size: 2.15em; font-weight: 600; margin: 0 0 .65em; }
 #editor h2 { font-size: 1.55em; font-weight: 600; margin: 1.75em 0 .55em; }
 #editor h3 { font-size: 1.2em; font-weight: 600; margin: 1.65em 0 .45em; }
@@ -85,17 +85,54 @@ button { cursor: pointer; }
 #editor li { padding-left: .2em; }
 #editor li + li { margin-top: .2em; }
 #editor blockquote { margin: 1.5em 0; padding: .1em 0 .1em 1.15em; border-left: 3px solid var(--accent); color: #5d625a; }
-#editor pre { overflow: auto; padding: 1.1em 1.3em; border-radius: 3px; background: #f0f0e9; font: 14px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
-#editor code { background: #f0f0e9; border-radius: 2px; padding: .1em .25em; font: .83em ui-monospace, SFMono-Regular, Menlo, monospace; }
+#editor pre { overflow: auto; padding: 1.1em 1.3em; border-radius: 3px; background: #f0f0e9; font: 14px/1.55 ui-monospace, "SFMono-Regular", "Menlo", "JetBrains Mono", "Fira Code", "Liberation Mono", "DejaVu Sans Mono", monospace; }
+#editor code { background: #f0f0e9; border-radius: 2px; padding: .1em .25em; font: .83em ui-monospace, "SFMono-Regular", "Menlo", "JetBrains Mono", "Fira Code", "Liberation Mono", "DejaVu Sans Mono", monospace; }
 #editor pre code { background: none; padding: 0; }
-#editor table { width: 100%; border-collapse: collapse; font: 14px/1.5 "Avenir Next", sans-serif; }
+#editor table { width: 100%; border-collapse: collapse; font: 14px/1.5 "Avenir Next", system-ui, sans-serif; }
 #editor th, #editor td { border-bottom: 1px solid var(--line); padding: .55em .7em; text-align: left; }
 #editor th { border-bottom: 2px solid var(--ink); font-weight: 700; }
-#editor img { max-width: 100%; }
-#editor a { color: #a74e35; text-decoration-color: #c18d7c; }
+#editor a { color: #a74e35; text-decoration-color: #c18d7c; cursor: text; }
+body.mod-active #editor a { cursor: pointer; text-decoration: underline; text-decoration-color: var(--accent); }
+body.mod-active #source { cursor: pointer; }
+
+.link-hint {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.12s ease-in-out, transform 0.12s ease-in-out;
+  transform: translateY(-2px);
+  background: var(--ink);
+  color: #fffefa;
+  font-family: ui-monospace, "SFMono-Regular", "Menlo", "JetBrains Mono", "Fira Code", monospace;
+  font-size: 11px;
+  line-height: 1.35;
+  padding: 5px 9px;
+  border-radius: 4px;
+  box-shadow: 0 4px 14px rgba(35, 39, 35, 0.22);
+  max-width: 420px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.link-hint.visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+@keyframes anchor-flash {
+  0% { background-color: rgba(188, 89, 61, 0.25); border-radius: 4px; }
+  100% { background-color: transparent; border-radius: 4px; }
+}
+.anchor-highlight {
+  animation: anchor-flash 1.5s ease-out;
+}
+
 #editor hr { border: 0; border-top: 1px solid var(--line); margin: 2.2em 0; }
 #editor input[type=checkbox] { margin-right: .55em; accent-color: var(--accent); }
-#source { display: none; resize: none; font: 14px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; tab-size: 2; }
+#source { display: none; resize: none; font: 14px/1.7 ui-monospace, "SFMono-Regular", "Menlo", "JetBrains Mono", "Fira Code", "Liberation Mono", "DejaVu Sans Mono", monospace; tab-size: 2; }
 body.source-mode #editor { display: none; }
 body.source-mode #source { display: block; }
 body.source-mode #mode { color: #fffefa; background: var(--accent); border-color: var(--accent); }
