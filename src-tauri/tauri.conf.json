@@ -28,7 +28,6 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["appimage", "deb"],
     "category": "Productivity",
     "shortDescription": "Offline-first Markdown editor",
     "longDescription": "An open-source Markdown editor with rich text, Markdown source view, printing, and PDF export.",

@@ -475,7 +475,8 @@
     },
     preparePrint: () => {
       if (document.body.classList.contains('source-mode')) render(source.value);
-    }
+    },
+    save: () => postNativeMessage('command', 'save')
   };
   setMarkdown('', 'Untitled.md', 'file:///');
   postNativeMessage('ready', true);

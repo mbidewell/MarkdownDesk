@@ -1,16 +1,26 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem, Submenu},
     AppHandle, Manager, WebviewWindow, WindowEvent,
 };
-use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+use tauri_plugin_dialog::{
+    DialogExt, MessageDialogButtons, MessageDialogKind, MessageDialogResult,
+};
 use url::Url;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum PendingAction {
+    None,
+    New,
+    Open(PathBuf),
+    Close,
+}
 
 pub struct AppState {
     pub current_file: Mutex<Option<PathBuf>>,
     pub dirty: Mutex<bool>,
-    pub pending_file: Mutex<Option<PathBuf>>,
+    pub pending_action: Mutex<PendingAction>,
 }
 
 fn js_string(s: &str) -> String {
@@ -67,6 +77,62 @@ fn open_file_at_path(window: &WebviewWindow, path: PathBuf, app: &AppHandle) {
     }
 }
 
+fn atomic_write(target: &Path, content: &str) -> std::io::Result<()> {
+    let parent = target.parent().unwrap_or_else(|| Path::new("."));
+    let filename = target
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("document.md");
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let temp_name = format!(".{}.tmp.{}.{}", filename, std::process::id(), nonce);
+    let temp_path = parent.join(temp_name);
+
+    {
+        use std::io::Write;
+        let mut file = std::fs::File::create(&temp_path)?;
+        file.write_all(content.as_bytes())?;
+        file.sync_all()?;
+    }
+
+    if let Err(err) = std::fs::rename(&temp_path, target) {
+        let _ = std::fs::remove_file(&temp_path);
+        return Err(err);
+    }
+    Ok(())
+}
+
+fn handle_save_request(window: &WebviewWindow, app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let has_file = state.current_file.lock().unwrap().is_some();
+    if has_file {
+        let _ = window.eval(
+            "window.__TAURI_INTERNALS__.invoke('save_content', { path: null, content: editorAPI.getMarkdown() });",
+        );
+    } else {
+        prompt_save_as(window, app);
+    }
+}
+
+fn is_save_choice(result: &MessageDialogResult) -> bool {
+    match result {
+        MessageDialogResult::Yes => true,
+        MessageDialogResult::Custom(s) => s == "Save",
+        _ => false,
+    }
+}
+
+fn is_discard_choice(result: &MessageDialogResult) -> bool {
+    match result {
+        MessageDialogResult::No => true,
+        MessageDialogResult::Custom(s) => s == "Discard",
+        _ => false,
+    }
+}
+
 fn prompt_new_document(window: &WebviewWindow, app: &AppHandle) {
     let state = app.state::<AppState>();
     let is_dirty = *state.dirty.lock().unwrap();
@@ -82,26 +148,29 @@ fn prompt_new_document(window: &WebviewWindow, app: &AppHandle) {
             .to_string();
 
         let window_clone = window.clone();
+        let app_clone = app.clone();
         window
             .dialog()
             .message(format!("Save changes to {}?", title_name))
             .title("Unsaved Changes")
             .kind(MessageDialogKind::Warning)
-            .buttons(MessageDialogButtons::OkCancelCustom(
+            .buttons(MessageDialogButtons::YesNoCancelCustom(
                 "Save".to_string(),
                 "Discard".to_string(),
+                "Cancel".to_string(),
             ))
-            .show(move |result| {
-                if result {
-                    let _ = window_clone.eval("postNativeMessage('command', 'save');");
-                } else {
+            .show_with_result(move |result| {
+                if is_save_choice(&result) {
+                    *app_clone.state::<AppState>().pending_action.lock().unwrap() =
+                        PendingAction::New;
+                    let _ = window_clone.eval("editorAPI.save();");
+                } else if is_discard_choice(&result) {
                     let state = window_clone.app_handle().state::<AppState>();
                     *state.current_file.lock().unwrap() = None;
                     *state.dirty.lock().unwrap() = false;
                     update_window_title(&window_clone, None, false);
-                    let _ = window_clone.eval(
-                        "editorAPI.setMarkdown('', 'Untitled.md', 'file:///', true);",
-                    );
+                    let _ = window_clone
+                        .eval("editorAPI.setMarkdown('', 'Untitled.md', 'file:///', true);");
                 }
             });
     } else {
@@ -134,16 +203,17 @@ fn confirm_and_open_file(window: &WebviewWindow, path: PathBuf, app: &AppHandle)
             .message(format!("Save changes to {}?", title_name))
             .title("Unsaved Changes")
             .kind(MessageDialogKind::Warning)
-            .buttons(MessageDialogButtons::OkCancelCustom(
+            .buttons(MessageDialogButtons::YesNoCancelCustom(
                 "Save".to_string(),
                 "Discard".to_string(),
+                "Cancel".to_string(),
             ))
-            .show(move |result| {
-                if result {
-                    *app_clone.state::<AppState>().pending_file.lock().unwrap() =
-                        Some(target_path);
-                    let _ = window_clone.eval("postNativeMessage('command', 'save');");
-                } else {
+            .show_with_result(move |result| {
+                if is_save_choice(&result) {
+                    *app_clone.state::<AppState>().pending_action.lock().unwrap() =
+                        PendingAction::Open(target_path);
+                    let _ = window_clone.eval("editorAPI.save();");
+                } else if is_discard_choice(&result) {
                     open_file_at_path(&window_clone, target_path, &app_clone);
                 }
             });
@@ -174,6 +244,7 @@ fn prompt_open_dialog(window: &WebviewWindow, app: &AppHandle) {
 
 fn prompt_save_as(window: &WebviewWindow, app: &AppHandle) {
     let window_clone = window.clone();
+    let app_clone = app.clone();
     let state = app.state::<AppState>();
     let default_name = state
         .current_file
@@ -204,6 +275,9 @@ fn prompt_save_as(window: &WebviewWindow, app: &AppHandle) {
                     escaped_path
                 );
                 let _ = window_clone.eval(&js);
+            } else {
+                *app_clone.state::<AppState>().pending_action.lock().unwrap() =
+                    PendingAction::None;
             }
         });
 }
@@ -224,7 +298,8 @@ fn save_content(
         return Err("No destination path specified".to_string());
     };
 
-    if let Err(e) = std::fs::write(&target, &content) {
+    if let Err(e) = atomic_write(&target, &content) {
+        *state.pending_action.lock().unwrap() = PendingAction::None;
         let msg = format!("Could not save {}: {}", target.display(), e);
         window
             .dialog()
@@ -248,16 +323,32 @@ fn save_content(
         .map(|p| format!("file://{}/", p.display()))
         .unwrap_or_else(|| "file:///".to_string());
 
-    let pending = state.pending_file.lock().unwrap().take();
-    if let Some(pending_path) = pending {
-        open_file_at_path(&window, pending_path, &app);
-    } else {
-        let _ = window.eval(&format!(
-            "editorAPI.setMarkdown({}, {}, {});",
-            js_string(&content),
-            js_string(filename),
-            js_string(&base)
-        ));
+    let pending = std::mem::replace(
+        &mut *state.pending_action.lock().unwrap(),
+        PendingAction::None,
+    );
+    match pending {
+        PendingAction::New => {
+            *state.current_file.lock().unwrap() = None;
+            *state.dirty.lock().unwrap() = false;
+            update_window_title(&window, None, false);
+            let _ = window
+                .eval("editorAPI.setMarkdown('', 'Untitled.md', 'file:///', true);");
+        }
+        PendingAction::Open(pending_path) => {
+            open_file_at_path(&window, pending_path, &app);
+        }
+        PendingAction::Close => {
+            let _ = window.close();
+        }
+        PendingAction::None => {
+            let _ = window.eval(&format!(
+                "editorAPI.setMarkdown({}, {}, {});",
+                js_string(&content),
+                js_string(filename),
+                js_string(&base)
+            ));
+        }
     }
 
     Ok(target.to_string_lossy().to_string())
@@ -273,9 +364,11 @@ fn native_message(
     let state = app.state::<AppState>();
     match name.as_str() {
         "ready" => {
-            let pending = state.pending_file.lock().unwrap().take();
-            if let Some(path) = pending {
-                open_file_at_path(&window, path, &app);
+            let mut pending = state.pending_action.lock().unwrap();
+            if let PendingAction::Open(path) = &*pending {
+                let path_to_open = path.clone();
+                *pending = PendingAction::None;
+                open_file_at_path(&window, path_to_open, &app);
             } else {
                 update_window_title(&window, None, false);
             }
@@ -312,16 +405,7 @@ fn native_message(
             match cmd.as_str() {
                 "new" => prompt_new_document(&window, &app),
                 "open" => prompt_open_dialog(&window, &app),
-                "save" => {
-                    let has_file = state.current_file.lock().unwrap().is_some();
-                    if has_file {
-                        let _ = window.eval(
-                            "window.__TAURI_INTERNALS__.invoke('save_content', { path: null, content: editorAPI.getMarkdown() });",
-                        );
-                    } else {
-                        prompt_save_as(&window, &app);
-                    }
-                }
+                "save" => handle_save_request(&window, &app),
                 "save_as" => prompt_save_as(&window, &app),
                 "print" | "export_pdf" => {
                     let _ = window.eval("editorAPI.print();");
@@ -405,13 +489,17 @@ pub fn run() {
         .skip(1)
         .find(|arg| !arg.starts_with('-') && std::path::Path::new(arg).exists())
         .map(PathBuf::from);
+    let initial_pending = match pending_cli_file {
+        Some(path) => PendingAction::Open(path),
+        None => PendingAction::None,
+    };
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState {
             current_file: Mutex::new(None),
             dirty: Mutex::new(false),
-            pending_file: Mutex::new(pending_cli_file),
+            pending_action: Mutex::new(initial_pending),
         })
         .invoke_handler(tauri::generate_handler![native_message, save_content])
         .setup(|app| {
@@ -425,17 +513,7 @@ pub fn run() {
                     match id {
                         "new" => prompt_new_document(&window, &handle),
                         "open" => prompt_open_dialog(&window, &handle),
-                        "save" => {
-                            let state = handle.state::<AppState>();
-                            let has_file = state.current_file.lock().unwrap().is_some();
-                            if has_file {
-                                let _ = window.eval(
-                                    "window.__TAURI_INTERNALS__.invoke('save_content', { path: null, content: editorAPI.getMarkdown() });",
-                                );
-                            } else {
-                                prompt_save_as(&window, &handle);
-                            }
-                        }
+                        "save" => handle_save_request(&window, &handle),
                         "save_as" => prompt_save_as(&window, &handle),
                         "print" => {
                             let _ = window.eval("editorAPI.print();");
@@ -480,20 +558,31 @@ pub fn run() {
                             .to_string();
 
                         let webview_clone = webview.clone();
+                        let app_clone = app.clone();
                         webview
                             .dialog()
                             .message(format!("Save changes to {} before closing?", filename))
                             .title("Unsaved Changes")
                             .kind(MessageDialogKind::Warning)
-                            .buttons(MessageDialogButtons::OkCancelCustom(
+                            .buttons(MessageDialogButtons::YesNoCancelCustom(
                                 "Save".to_string(),
                                 "Discard".to_string(),
+                                "Cancel".to_string(),
                             ))
-                            .show(move |save_choice| {
-                                if save_choice {
-                                    let _ = webview_clone.eval("postNativeMessage('command', 'save');");
-                                } else {
-                                    *webview_clone.app_handle().state::<AppState>().dirty.lock().unwrap() = false;
+                            .show_with_result(move |result| {
+                                if is_save_choice(&result) {
+                                    *app_clone
+                                        .state::<AppState>()
+                                        .pending_action
+                                        .lock()
+                                        .unwrap() = PendingAction::Close;
+                                    let _ = webview_clone.eval("editorAPI.save();");
+                                } else if is_discard_choice(&result) {
+                                    *app_clone
+                                        .state::<AppState>()
+                                        .dirty
+                                        .lock()
+                                        .unwrap() = false;
                                     let _ = webview_clone.close();
                                 }
                             });
@@ -504,3 +593,41 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn test_atomic_write_creates_and_overwrites() {
+        let dir = std::env::temp_dir().join(format!("markdowndesk_test_{}", std::process::id()));
+        let _ = fs::create_dir_all(&dir);
+        let file = dir.join("test_doc.md");
+
+        assert!(atomic_write(&file, "first content").is_ok());
+        assert_eq!(fs::read_to_string(&file).unwrap(), "first content");
+
+        assert!(atomic_write(&file, "second content").is_ok());
+        assert_eq!(fs::read_to_string(&file).unwrap(), "second content");
+
+        let _ = fs::remove_file(&file);
+        let _ = fs::remove_dir(&dir);
+    }
+
+    #[test]
+    fn test_dialog_choices() {
+        assert!(is_save_choice(&MessageDialogResult::Yes));
+        assert!(is_save_choice(&MessageDialogResult::Custom("Save".to_string())));
+        assert!(!is_save_choice(&MessageDialogResult::No));
+        assert!(!is_save_choice(&MessageDialogResult::Cancel));
+        assert!(!is_save_choice(&MessageDialogResult::Custom("Discard".to_string())));
+
+        assert!(is_discard_choice(&MessageDialogResult::No));
+        assert!(is_discard_choice(&MessageDialogResult::Custom("Discard".to_string())));
+        assert!(!is_discard_choice(&MessageDialogResult::Yes));
+        assert!(!is_discard_choice(&MessageDialogResult::Cancel));
+        assert!(!is_discard_choice(&MessageDialogResult::Custom("Save".to_string())));
+    }
+}
+

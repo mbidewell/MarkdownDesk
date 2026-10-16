@@ -3,10 +3,15 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const fs = require('node:fs');
 const { JSDOM } = require('jsdom');
+const { prepareVendor } = require('../scripts/prepare-vendor.js');
 
 async function editorWindow(onChanged = () => {}, onCommand = () => {}, onOpenLink = () => {}) {
   const appHtml = path.join(process.env.MARKDOWNDESK_BUILD_DIR || path.join(__dirname, '..', 'build'),
     'MarkdownDesk.app', 'Contents', 'Resources', 'Web', 'index.html');
+  const vendorCheck = path.join(__dirname, '..', 'Web', 'vendor', 'marked.js');
+  if (!fs.existsSync(appHtml) && !fs.existsSync(vendorCheck)) {
+    prepareVendor();
+  }
   const html = fs.existsSync(appHtml) ? appHtml : path.join(__dirname, '..', 'Web', 'index.html');
   const dom = await JSDOM.fromFile(html, {
     resources: 'usable',
@@ -32,6 +37,14 @@ test('New button invokes the native New command', async () => {
   const dom = await editorWindow(() => {}, (command) => commands.push(command));
   dom.window.document.querySelector('#new-file').click();
   assert.deepEqual(commands, ['new']);
+  dom.window.close();
+});
+
+test('editorAPI.save invokes the native Save command', async () => {
+  const commands = [];
+  const dom = await editorWindow(() => {}, (command) => commands.push(command));
+  dom.window.editorAPI.save();
+  assert.deepEqual(commands, ['save']);
   dom.window.close();
 });
 
